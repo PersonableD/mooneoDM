@@ -8,8 +8,8 @@ app.use(bodyParser.json());
 const VERIFY_TOKEN = "mooneo_verify_token_123";
 
 // 👉 나중에 페이지 만들고 값 채워 넣을 자리
-const PAGE_ID = process.env.PAGE_ID || "DUMMY_PAGE_ID";
-const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN || "DUMMY_TOKEN";
+const PAGE_ID = "여기에_페이스북_페이지_ID";
+const PAGE_ACCESS_TOKEN = "여기에_PAGE_ACCESS_TOKEN";
 
 // 테스트용 홈
 app.get("/", (req, res) => {
@@ -114,7 +114,7 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 app.listen(PORT, () => {
   console.log(`서버가 실행 중입니다! http://localhost:${PORT}`);
 });
