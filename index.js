@@ -8,6 +8,10 @@ const IG_SCRAPER_USERNAME =
 const IG_SCRAPER_PASSWORD =
   process.env.IG_SCRAPER_PASSWORD || "YOUR_IG_LOGIN_PASSWORD";
 
+const Instagram = require("instagram-web-api");
+const FileCookieStore = require("tough-cookie-filestore2");
+const path = require("path");
+
 // 쿠키 파일 경로 (로그인 유지용)//ㅎㅎ
 const cookieStore = new FileCookieStore(
   path.join(__dirname, "ig_cookies.json")
