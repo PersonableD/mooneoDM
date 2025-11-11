@@ -8,7 +8,7 @@ const IG_SCRAPER_USERNAME =
 const IG_SCRAPER_PASSWORD =
   process.env.IG_SCRAPER_PASSWORD || "YOUR_IG_LOGIN_PASSWORD";
 
-// 쿠키 파일 경로 (로그인 유지용)
+// 쿠키 파일 경로 (로그인 유지용)//ㅎㅎ
 const cookieStore = new FileCookieStore(
   path.join(__dirname, "ig_cookies.json")
 );
