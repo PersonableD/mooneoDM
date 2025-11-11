@@ -2,20 +2,41 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const axios = require("axios"); // ⭐ DM 보낼 때 쓸 예정
 
+const Instagram = require("instagram-web-api");
+const FileCookieStore = require("tough-cookie-filestore2");
+const path = require("path");
+
+// 3) ⭐ 먼저 express 앱을 만든다
+const app = express();
+app.use(bodyParser.json());
+
+const VERIFY_TOKEN = "mooneo_verify_token_123";
 // 인스타 스크래핑용 계정 (내 계정이어도 되지만, 별도 계정 추천)
 const IG_SCRAPER_USERNAME =
   process.env.IG_SCRAPER_USERNAME || "YOUR_IG_LOGIN_ID";
 const IG_SCRAPER_PASSWORD =
   process.env.IG_SCRAPER_PASSWORD || "YOUR_IG_LOGIN_PASSWORD";
 
-const Instagram = require("instagram-web-api");
-const FileCookieStore = require("tough-cookie-filestore2");
-const path = require("path");
+// 👉 나중에 페이지 만들고 값 채워 넣을 자리
+const PAGE_ID = process.env.PAGE_ID || "DUMMY_PAGE_ID";
+const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN || "DUMMY_TOKEN";
+const IG_BUSINESS_ID = process.env.IG_BUSINESS_ID || "DUMMY_IG_BIZ_ID";
+
+// 🔥 테스트/운영용으로 사용할 타겟 게시물 ID & 키워드
+// - 먼저 테스트용 릴스 ID + "테스트키워드"로 설정
+// - 검증 끝난 뒤 실제 릴스 ID + "뜨개앱"으로 교체
+const TARGET_MEDIA_ID = process.env.TARGET_MEDIA_ID || "DUMMY_MEDIA_ID";
+const TRIGGER_KEYWORD =
+  (process.env.TRIGGER_KEYWORD && process.env.TRIGGER_KEYWORD.toLowerCase()) ||
+  "뜨개앱";
 
 // 쿠키 파일 경로 (로그인 유지용)//ㅎㅎ
 const cookieStore = new FileCookieStore(
   path.join(__dirname, "ig_cookies.json")
 );
+// 한 번만 로그인 & 내 userId 캐싱용
+let igLoginPromise = null;
+let IG_SELF_ID = null;
 
 // instagram-web-api 클라이언트
 const igClient = new Instagram({
@@ -23,10 +44,6 @@ const igClient = new Instagram({
   password: IG_SCRAPER_PASSWORD,
   cookieStore,
 });
-
-// 한 번만 로그인 & 내 userId 캐싱용
-let igLoginPromise = null;
-let IG_SELF_ID = null;
 
 async function ensureIgLoggedIn() {
   if (igLoginPromise) return igLoginPromise;
@@ -52,21 +69,6 @@ async function ensureIgLoggedIn() {
 
   return igLoginPromise;
 }
-
-const VERIFY_TOKEN = "mooneo_verify_token_123";
-
-// 👉 나중에 페이지 만들고 값 채워 넣을 자리
-const PAGE_ID = process.env.PAGE_ID || "DUMMY_PAGE_ID";
-const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN || "DUMMY_TOKEN";
-const IG_BUSINESS_ID = process.env.IG_BUSINESS_ID || "DUMMY_IG_BIZ_ID";
-
-// 🔥 테스트/운영용으로 사용할 타겟 게시물 ID & 키워드
-// - 먼저 테스트용 릴스 ID + "테스트키워드"로 설정
-// - 검증 끝난 뒤 실제 릴스 ID + "뜨개앱"으로 교체
-const TARGET_MEDIA_ID = process.env.TARGET_MEDIA_ID || "DUMMY_MEDIA_ID";
-const TRIGGER_KEYWORD =
-  (process.env.TRIGGER_KEYWORD && process.env.TRIGGER_KEYWORD.toLowerCase()) ||
-  "뜨개앱";
 
 // 테스트용 홈
 app.get("/", (req, res) => {
