@@ -2,8 +2,52 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const axios = require("axios"); // ⭐ DM 보낼 때 쓸 예정
 
-const app = express();
-app.use(bodyParser.json());
+// 인스타 스크래핑용 계정 (내 계정이어도 되지만, 별도 계정 추천)
+const IG_SCRAPER_USERNAME =
+  process.env.IG_SCRAPER_USERNAME || "YOUR_IG_LOGIN_ID";
+const IG_SCRAPER_PASSWORD =
+  process.env.IG_SCRAPER_PASSWORD || "YOUR_IG_LOGIN_PASSWORD";
+
+// 쿠키 파일 경로 (로그인 유지용)
+const cookieStore = new FileCookieStore(
+  path.join(__dirname, "ig_cookies.json")
+);
+
+// instagram-web-api 클라이언트
+const igClient = new Instagram({
+  username: IG_SCRAPER_USERNAME,
+  password: IG_SCRAPER_PASSWORD,
+  cookieStore,
+});
+
+// 한 번만 로그인 & 내 userId 캐싱용
+let igLoginPromise = null;
+let IG_SELF_ID = null;
+
+async function ensureIgLoggedIn() {
+  if (igLoginPromise) return igLoginPromise;
+
+  igLoginPromise = (async () => {
+    console.log("🔐 인스타그램 웹 API 로그인 시도");
+
+    await igClient.login();
+    const profile = await igClient.getProfile();
+    IG_SELF_ID = profile.id;
+
+    console.log(
+      "✅ 인스타그램 로그인 성공:",
+      profile.username,
+      "id:",
+      IG_SELF_ID
+    );
+  })().catch((err) => {
+    igLoginPromise = null; // 실패했으면 다시 시도할 수 있게
+    console.error("❌ 인스타그램 로그인 실패:", err.message);
+    throw err;
+  });
+
+  return igLoginPromise;
+}
 
 const VERIFY_TOKEN = "mooneo_verify_token_123";
 
@@ -25,35 +69,53 @@ app.get("/", (req, res) => {
   res.send("안녕! 나는 mooneoDM 서버야 🐙");
 });
 
-// 댓글 단 userId가 "나를 팔로우하는지" 확인
-async function checkIfFollowsMe(userId) {
-  console.log("👀 팔로우 여부 확인 시작. userId:", userId);
-
-  // followers 목록 조회 (페이징 간단 버전)
-  const url = `https://graph.facebook.com/v21.0/${IG_BUSINESS_ID}/followers`;
+// 댓글 단 user가 "내 인스타 계정을 팔로우 중인지" 확인
+// 👉 username 기준으로 검사 (Graph API id랑 인스타 웹 API id가 다를 수 있어서)
+async function checkIfFollowsMe(username) {
+  if (!username) {
+    console.log("⚠️ checkIfFollowsMe: username 없음");
+    return false;
+  }
 
   try {
-    const res = await axios.get(url, {
-      params: {
-        access_token: PAGE_ACCESS_TOKEN,
-        fields: "id,username",
-        limit: 100, // 테스트용, 팔로워 많으면 페이징 필요
-      },
+    // 1) 인스타 웹 API 로그인 + 내 계정 ID 확보
+    await ensureIgLoggedIn();
+
+    if (!IG_SELF_ID) {
+      console.log("⚠️ IG_SELF_ID 없음");
+      return false;
+    }
+
+    console.log(`🔎 팔로워 목록에서 ${username} 검색 중...`);
+
+    // 2) 팔로워 목록 가져오기
+    //   - first: 한 번에 가져올 팔로워 수 (여기선 넉넉하게 5000)
+    const followersPage = await igClient.getFollowers({
+      userId: IG_SELF_ID,
+      first: 5000,
     });
 
-    const followers = res.data.data || [];
-    console.log("📊 followers count:", followers.length);
+    // instagram-web-api 응답 형태: { data: [...], count, page_info ... } 형태
+    const followers = followersPage.data || followersPage;
 
-    const isFollower = followers.some((f) => f.id === userId);
-    console.log(`👀 ${userId} follows me?`, isFollower);
+    const target = username.toLowerCase();
+
+    const isFollower = followers.some(
+      (f) => (f.username || "").toLowerCase() === target
+    );
+
+    console.log(
+      `✅ 팔로워 여부(${username}):`,
+      isFollower ? "팔로워 맞음" : "팔로워 아님"
+    );
 
     return isFollower;
   } catch (err) {
     console.error(
-      "❌ 팔로우 여부 확인 중 에러:",
+      "❌ checkIfFollowsMe 실행 중 에러:",
       err.response?.data || err.message
     );
-    // 에러 났을 때는 일단 false 취급
+    // 에러 났을 땐 안전하게 "팔로워 아님"으로 처리
     return false;
   }
 }
@@ -162,7 +224,7 @@ app.post("/webhook", async (req, res) => {
           }
 
           // 🔥 2️⃣ 팔로우 여부 확인
-          const isFollower = await checkIfFollowsMe(igUserId);
+          const isFollower = await checkIfFollowsMe(username);
 
           if (!isFollower) {
             // 조건 2: "댓글만 달았을 때" → 댓글 답글로 안내
